@@ -1,0 +1,59 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>THE GODFATHER POS</title><style>
+body{margin:0;background:#101010;color:#fff;font-family:system-ui}header{text-align:center;padding:22px;background:#171717}h1,h2{color:#d9ae43}nav{display:flex;gap:8px;overflow:auto;padding:10px;background:#191919}button{border:0;border-radius:9px;padding:11px 14px;font-weight:700}nav button{background:#333;color:#fff}.active,.gold{background:#d9ae43!important;color:#111!important}main{max-width:1000px;margin:auto;padding:14px}.panel{background:#1b1b1b;border:1px solid #3b3b3b;border-radius:14px;padding:16px;margin-bottom:14px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}input{width:100%;padding:11px;box-sizing:border-box;border-radius:8px;border:1px solid #555;background:#101010;color:#fff}table{width:100%;border-collapse:collapse}th,td{padding:9px;border-bottom:1px solid #333;text-align:left}th{color:#d9ae43}.hidden{display:none}.muted{color:#aaa}.total{font-size:26px;color:#d9ae43;font-weight:900}</style></head><body>
+<header><h1>THE GODFATHER POS</h1><div class="muted">Mini Market · Beta 0.8 Completo</div></header>
+<nav><button class="active" onclick="tab('i',this)">Inicio</button><button onclick="tab('v',this)">Ventas</button><button onclick="tab('s',this)">Inventario</button><button onclick="tab('p',this)">Productos</button></nav>
+<main>
+<section id="i" class="panel"><h2>Bienvenido</h2><p>Versión autónoma: no necesita <b>index.html</b>.</p><div class="grid"><div class="panel">Productos<h2 id="np">0</h2></div><div class="panel">Unidades en stock<h2 id="ns">0</h2></div><div class="panel">Ventas<h2 id="nv">0</h2></div></div></section>
+<section id="v" class="panel hidden"><h2>🛒 Punto de venta</h2>
+<div class="panel" style="background:#141414">
+<h3 style="color:#d9ae43">📷 Escáner</h3>
+<p class="muted">Activa la cámara y apunta al código de barras.</p>
+<button class="gold" onclick="startScanner()">📷 Activar cámara</button>
+<button onclick="stopScanner()">⏹ Detener</button>
+<div id="scanStatus" class="muted" style="margin-top:10px">Cámara apagada</div>
+<video id="scannerVideo" playsinline autoplay muted style="display:none;width:100%;max-height:320px;margin-top:12px;border-radius:12px;background:#000"></video>
+</div><div class="grid"><input id="vp" placeholder="Producto o código"><input id="vc" type="number" min="1" value="1"></div><br><button class="gold" onclick="add()">Agregar</button><p id="msg" class="muted"></p><table><thead><tr><th>Producto</th><th>Cant.</th><th>Precio</th><th>Subtotal</th><th></th></tr></thead><tbody id="cart"></tbody></table><p style="text-align:right">TOTAL <span class="total" id="tot">$0.00</span></p><button class="gold" onclick="finish()">Finalizar venta</button></section>
+<section id="s" class="panel hidden"><h2>📦 Inventario</h2><input id="q" placeholder="Buscar..." oninput="render()"><br><br><table><thead><tr><th>Producto</th><th>Stock</th><th>Compra</th><th>Venta</th></tr></thead><tbody id="inv"></tbody></table></section>
+<section id="p" class="panel hidden"><h2>➕ Producto</h2><div class="grid"><input id="n" placeholder="Nombre"><input id="c" placeholder="Código"><input id="u" type="number" step=".01" placeholder="Precio unitario"><input id="x" type="number" step=".01" placeholder="Six-pack"><input id="b" type="number" step=".01" placeholder="Compra/caja"><input id="w" type="number" step=".01" placeholder="Venta/caja"><input id="bx" type="number" value="24" placeholder="Unidades/caja"><input id="st" type="number" value="0" placeholder="Cajas stock"><input id="sup" placeholder="Proveedor"></div><br><button class="gold" onclick="newP()">Guardar</button></section>
+</main><script>
+const initial=[["Corona 330ml",1.5,8,27.25,30,24,70,"Distribuidor DC"],["Amstel 330ml",1.1,6.5,22.5,24,24,30,"Heineken S.A."],["Club Clásica 330ml",1.25,7.5,0,0,24,0,""],["Dorada 355ml",.75,4.5,13.5,16,24,25,""],["Fioravanti",1.15,0,0,0,24,12,""],["Presentación adicional",1,6,21,23.5,24,25,""],["Coca-Cola",0,0,1.05,0,24,0,""]].map(a=>({name:a[0],unit:a[1],six:a[2],buy:a[3],sell:a[4],box:a[5],stock:a[6],supplier:a[7],code:""}));
+let db=JSON.parse(localStorage.getItem("godfather08")||"null")||{products:initial,sales:[]},cartItems=[];
+const money=n=>"$"+Number(n||0).toFixed(2);
+function save(){localStorage.setItem("godfather08",JSON.stringify(db))}
+function tab(id,b){document.querySelectorAll("main section").forEach(x=>x.classList.add("hidden"));document.getElementById(id).classList.remove("hidden");document.querySelectorAll("nav button").forEach(x=>x.classList.remove("active"));b.classList.add("active");refresh()}
+function refresh(){np.textContent=db.products.length;ns.textContent=db.products.reduce((a,p)=>a+p.stock*p.box,0);nv.textContent=db.sales.length;render()}
+function render(){let t=(q?.value||"").toLowerCase();inv.innerHTML=db.products.filter(p=>p.name.toLowerCase().includes(t)).map(p=>`<tr><td>${p.name}</td><td>${p.stock} cajas / ${p.stock*p.box} u.</td><td>${money(p.buy)}</td><td>${money(p.sell)}</td></tr>`).join("");cart.innerHTML=cartItems.map((x,i)=>`<tr><td>${x.p.name}</td><td>${x.q}</td><td>${money(x.price)}</td><td>${money(x.q*x.price)}</td><td><button onclick="cartItems.splice(${i},1);render()">×</button></td></tr>`).join("");tot.textContent=money(cartItems.reduce((a,x)=>a+x.q*x.price,0))}
+function add(){let text=vp.value.trim().toLowerCase(),qty=Math.max(1,+vc.value||1),p=db.products.find(x=>x.name.toLowerCase()==text||x.code==text);if(!p){msg.textContent="Producto no encontrado.";return}if(qty>p.stock*p.box){msg.textContent="Stock insuficiente.";return}let price=qty>=6&&p.six?p.six/6:p.unit;if(!price){msg.textContent="Producto sin precio unitario.";return}cartItems.push({p,q:qty,price});vp.value="";vc.value=1;msg.textContent="Producto agregado.";render()}
+function finish(){if(!cartItems.length)return;cartItems.forEach(x=>x.p.stock=Math.max(0,x.p.stock-x.q/x.p.box));let total=cartItems.reduce((a,x)=>a+x.q*x.price,0);db.sales.push({date:new Date().toISOString(),total});save();cartItems=[];render();refresh();alert("Venta registrada: "+money(total))}
+function newP(){let p={name:n.value.trim(),code:c.value.trim(),unit:+u.value||0,six:+x.value||0,buy:+b.value||0,sell:+w.value||0,box:+bx.value||24,stock:+st.value||0,supplier:sup.value.trim()};if(!p.name)return alert("Escribe el nombre.");db.products.push(p);save();refresh();alert("Producto guardado.")}
+
+let scanStream=null,scanTimer=null,barcodeDetector=null;
+async function startScanner(){
+ const st=document.getElementById("scanStatus"),v=document.getElementById("scannerVideo");
+ if(!window.isSecureContext){st.textContent="⚠️ La cámara necesita HTTPS. Abre el POS desde una dirección segura.";return}
+ if(!navigator.mediaDevices?.getUserMedia){st.textContent="⚠️ Este navegador no permite acceso a la cámara.";return}
+ try{
+  scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"},width:{ideal:1280},height:{ideal:720}},audio:false});
+  v.srcObject=scanStream;v.style.display="block";st.textContent="✅ Cámara activa. Apunta al código.";
+  if("BarcodeDetector" in window){barcodeDetector=new BarcodeDetector({formats:["ean_13","ean_8","upc_a","upc_e","code_128","code_39","itf"]});scanLoop()}
+  else st.textContent="✅ Cámara activa, pero este navegador no ofrece lectura automática de códigos.";
+ }catch(e){st.textContent="⚠️ No se pudo abrir la cámara. Revisa el permiso del navegador."}
+}
+async function scanLoop(){
+ if(!scanStream||!barcodeDetector)return;
+ const v=document.getElementById("scannerVideo");
+ if(v.readyState>=2)try{
+  const codes=await barcodeDetector.detect(v);
+  if(codes.length){document.getElementById("vp").value=codes[0].rawValue;document.getElementById("scanStatus").textContent="✅ Código detectado: "+codes[0].rawValue;add();return}
+ }catch(e){}
+ scanTimer=requestAnimationFrame(scanLoop)
+}
+function stopScanner(){
+ if(scanTimer)cancelAnimationFrame(scanTimer);scanTimer=null;
+ if(scanStream)scanStream.getTracks().forEach(t=>t.stop());scanStream=null;
+ const v=document.getElementById("scannerVideo");if(v){v.srcObject=null;v.style.display="none"}
+ document.getElementById("scanStatus").textContent="Cámara apagada"
+}
+
+refresh();
+</script></body></html>
